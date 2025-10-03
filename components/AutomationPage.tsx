@@ -1,6 +1,7 @@
 
+
 import React, { useState } from 'react';
-import { Automation } from './types.ts';
+import { Automation, Action } from './types.ts';
 import AutomationEditor from './AutomationEditor.tsx';
 
 interface AutomationPageProps {
@@ -21,16 +22,16 @@ const getTriggerDescription = (automation: Automation): string => {
     }
 };
 
-const getActionDescription = (automation: Automation): string => {
-    switch (automation.action_type) {
+const getSingleActionDescription = (action: Action): string => {
+    switch (action.action_type) {
         case 'webhook':
             return `Trigger a webhook`;
         case 'create_task':
-            return `Create a task: "${automation.action_config.task_title}"`;
+            return `Create a task: "${action.action_config.task_title}"`;
         case 'add_to_schedule':
             return 'Add job to the schedule';
         case 'send_email':
-            return `Send an email with subject: "${automation.action_config.email_subject}"`;
+            return `Send an email with subject: "${action.action_config.email_subject}"`;
         case 'update_inventory':
             return `Deduct foam sets from inventory`;
         default:
@@ -95,12 +96,21 @@ const AutomationPage: React.FC<AutomationPageProps> = ({ automations, onAddAutom
                                     </label>
                                     <div className="flex-grow mx-4">
                                         <p className={`font-semibold text-slate-800 dark:text-slate-100 ${!auto.is_enabled ? 'line-through text-slate-400 dark:text-slate-500' : ''}`}>{auto.name}</p>
-                                        <p className={`text-xs text-slate-500 dark:text-slate-400 ${!auto.is_enabled ? 'line-through' : ''}`}>
-                                            <span className="font-medium">When:</span> {getTriggerDescription(auto)}
-                                        </p>
-                                        <p className={`text-xs text-slate-500 dark:text-slate-400 ${!auto.is_enabled ? 'line-through' : ''}`}>
-                                            <span className="font-medium">Then:</span> {getActionDescription(auto)}
-                                        </p>
+                                        <div className={`text-xs text-slate-500 dark:text-slate-400 ${!auto.is_enabled ? 'line-through' : ''}`}>
+                                            <p><span className="font-medium">When:</span> {getTriggerDescription(auto)}</p>
+                                            <div>
+                                                <span className="font-medium">Then:</span>
+                                                {auto.actions && auto.actions.length > 1 ? (
+                                                    <ol className="list-decimal list-inside ml-2">
+                                                        {auto.actions.map((action) => (
+                                                            <li key={action.id}>{getSingleActionDescription(action)}</li>
+                                                        ))}
+                                                    </ol>
+                                                ) : (
+                                                    ` ${auto.actions && auto.actions.length > 0 ? getSingleActionDescription(auto.actions[0]) : 'No action configured'}`
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button onClick={() => handleOpenEditor(auto)} className="p-2 rounded-full text-slate-500 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-600">

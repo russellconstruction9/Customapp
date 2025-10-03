@@ -1,6 +1,7 @@
 
 
-import { Automation, Task, Job } from '../components/types.ts';
+
+import { Automation, Task, Job, Action } from '../components/types.ts';
 import { EstimateRecord } from './db.ts';
 import { CustomerInfo } from '../components/EstimatePDF.tsx';
 import { fmtInput } from '../components/utils.ts';
@@ -48,31 +49,37 @@ export const processAutomations = (
 
         if (shouldRun) {
             console.log(`Running automation: ${automation.name}`);
-            executeAction(automation, data, handlers);
+            executeActions(automation, data, handlers);
         }
     }
 };
 
-const executeAction = async (automation: Automation, data: CustomerInfo | EstimateRecord, handlers: ActionHandlers) => {
-    switch (automation.action_type) {
+const executeActions = async (automation: Automation, data: CustomerInfo | EstimateRecord, handlers: ActionHandlers) => {
+    for (const action of automation.actions) {
+        await executeAction(action, data, handlers, automation.name);
+    }
+};
+
+const executeAction = async (action: Action, data: CustomerInfo | EstimateRecord, handlers: ActionHandlers, automationName: string) => {
+    switch (action.action_type) {
         case 'webhook':
-            if (automation.action_config.url) {
+            if (action.action_config.url) {
                 try {
-                    await fetch(automation.action_config.url, {
+                    await fetch(action.action_config.url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(data),
                     });
                 } catch (error) {
-                    console.error(`Webhook for automation "${automation.name}" failed:`, error);
+                    console.error(`Webhook for automation "${automationName}" failed:`, error);
                 }
             }
             break;
 
         case 'create_task':
-            if (automation.action_config.task_title) {
-                const title = replacePlaceholders(automation.action_config.task_title, data);
-                const description = replacePlaceholders(automation.action_config.task_description || '', data);
+            if (action.action_config.task_title) {
+                const title = replacePlaceholders(action.action_config.task_title, data);
+                const description = replacePlaceholders(action.action_config.task_description || '', data);
                 await handlers.createTask({
                     title,
                     description,
@@ -97,12 +104,12 @@ const executeAction = async (automation: Automation, data: CustomerInfo | Estima
         
         case 'send_email':
             const customerEmail = (data as any).calcData?.customer?.email || (data as CustomerInfo).email;
-            if (customerEmail && automation.action_config.email_subject) {
-                const subject = replacePlaceholders(automation.action_config.email_subject, data);
-                const body = replacePlaceholders(automation.action_config.email_body || '', data);
+            if (customerEmail && action.action_config.email_subject) {
+                const subject = replacePlaceholders(action.action_config.email_subject, data);
+                const body = replacePlaceholders(action.action_config.email_body || '', data);
                 await handlers.sendEmail(customerEmail, subject, body);
             } else {
-                console.warn(`Automation "${automation.name}" skipped: No customer email found.`);
+                console.warn(`Automation "${automationName}" skipped: No customer email found.`);
             }
             break;
 
@@ -110,7 +117,7 @@ const executeAction = async (automation: Automation, data: CustomerInfo | Estima
             if ('estimateNumber' in data) { // Check if data is an EstimateRecord
                 await handlers.deductInventoryForJob(data as EstimateRecord);
             } else {
-                console.warn(`Automation "${automation.name}" skipped: 'update_inventory' action can only be triggered by job-related events.`);
+                console.warn(`Automation "${automationName}" skipped: 'update_inventory' action can only be triggered by job-related events.`);
             }
             break;
     }

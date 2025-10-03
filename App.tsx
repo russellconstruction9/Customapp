@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import SprayFoamCalculator, { CalculationResults, CalculatorInputs, InventoryLineItem } from './components/SprayFoamCalculator.tsx';
 import JobCosting from './components/JobCosting.tsx';
@@ -23,7 +24,7 @@ import LoginScreen from './components/LoginScreen.tsx';
 import { CompanyInfo, CustomerInfo } from './components/EstimatePDF.tsx';
 import { EstimateRecord, JobStatus, InventoryItem } from './lib/db.ts';
 import { CostSettings, DEFAULT_COST_SETTINGS } from './lib/processing.ts';
-import { Job, Employee, Task, Automation } from './components/types.ts';
+import { Job, Employee, Task, Automation, Action } from './components/types.ts';
 import Logo from './components/Logo.tsx';
 import CloudSync from './components/CloudSync.tsx';
 import AutomationPage from './components/AutomationPage.tsx';
@@ -270,7 +271,39 @@ const App: React.FC = () => {
         setEmployees(allEmployees);
         setInventoryItems(allItems);
         setTasks(allTasks);
-        setAutomations(allAutomations);
+
+        // Data migration for automations from single action to multiple actions
+        const migratedAutomations = allAutomations.map((auto: any, index) => {
+            if (auto.action_type && auto.action_config) {
+                // This is the old format, convert it
+                const newAuto: Automation = {
+                    id: auto.id,
+                    name: auto.name,
+                    trigger_type: auto.trigger_type,
+                    trigger_config: auto.trigger_config,
+                    is_enabled: auto.is_enabled,
+                    actions: [{
+                        id: Date.now() + index, // Ensure unique ID for react key
+                        action_type: auto.action_type,
+                        action_config: auto.action_config
+                    }]
+                };
+                // Persist the migrated format
+                api.updateAutomation(newAuto);
+                return newAuto;
+            }
+             // Ensure actions in the new format have unique IDs for UI keys
+            if (auto.actions) {
+                auto.actions = auto.actions.map((action: any, actionIndex: number) => ({
+                    ...action,
+                    id: action.id || Date.now() + index + actionIndex
+                }));
+            }
+            return auto;
+        });
+
+        setAutomations(migratedAutomations);
+
 
     } catch (err) {
         console.error("Failed to load data:", err);
