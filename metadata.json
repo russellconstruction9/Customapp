@@ -1,0 +1,9 @@
+{
+  "name": "Copy of CRMAI",
+  "description": "A App for contractors",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
