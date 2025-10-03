@@ -29,6 +29,7 @@ import CloudSync from './components/CloudSync.tsx';
 import AutomationPage from './components/AutomationPage.tsx';
 import { processAutomations } from './lib/automations.ts';
 import * as api from './lib/api.ts'; // Import the new API service layer
+import { getMcpClient } from './lib/mcp.ts';
 
 export type Page = 'dashboard' | 'calculator' | 'costing' | 'customers' | 'customerDetail' | 'jobsList' | 'jobDetail' | 'materialOrder' | 'invoicing' | 'schedule' | 'gantt' | 'map' | 'settings' | 'team' | 'more' | 'timeclock' | 'inventory' | 'employeeDashboard' | 'automations';
 
@@ -173,13 +174,23 @@ const App: React.FC = () => {
     
   // --- Automation Action Handlers ---
   const handleSendEmail = async (to: string, subject: string, body: string) => {
-    // In a real app, this would call a backend service.
-    // For now, we'll log it to the console for demonstration.
-    console.log("---- SENDING EMAIL (SIMULATED) ----");
-    console.log("To:", to);
-    console.log("Subject:", subject);
-    console.log("Body:", body);
-    console.log("-----------------------------------");
+    // This now uses the real MCP client to send an email via Zapier.
+    console.log(`Attempting to send email to ${to} via MCP automation...`);
+    try {
+        const client = await getMcpClient();
+        await client.callTool({
+            name: "gmail_send_email",
+            arguments: {
+                instructions: `Send an email to the customer with the subject "${subject}" and the provided body content.`,
+                to: to,
+                subject: subject,
+                body: body,
+            },
+        });
+        console.log("MCP email tool called successfully for automation.");
+    } catch (error) {
+        console.error("Failed to send email via MCP automation:", error);
+    }
   };
 
   const handleDeductInventoryForJob = async (job: EstimateRecord) => {
@@ -626,8 +637,8 @@ const App: React.FC = () => {
 
         {currentUser && (
             <>
-                {currentUser.role === 'admin' && (
-                    <CloudSync customers={customers} jobs={jobs} />
+                {currentUser.role === 'admin' && companyInfo && (
+                    <CloudSync customers={customers} jobs={jobs} companyInfo={companyInfo} getMcpClient={getMcpClient} />
                 )}
                 <GeminiAgent 
                     setMainPage={setPage}
